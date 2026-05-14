@@ -16,15 +16,28 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS Configuration - Production Ready
-cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://majestic-projects.vercel.app")
-cors_origins = [origin.strip() for origin in cors_origins_env.split(",")]
+# CORS Configuration - CRITICAL FOR PRODUCTION
+# This MUST be configured immediately after app initialization
+origins = [
+    "http://localhost:3000",
+    "https://majestic-projects.vercel.app",
+]
 
-print(f"🌐 CORS enabled for origins: {cors_origins}")
+# Allow additional origins from environment variable
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+if cors_origins_env:
+    additional_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    origins.extend(additional_origins)
+
+# Remove duplicates while preserving order
+origins = list(dict.fromkeys(origins))
+
+print(f"🌐 CORS MIDDLEWARE ENABLED")
+print(f"🌐 Allowed origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
