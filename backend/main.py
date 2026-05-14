@@ -16,8 +16,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS Configuration
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+# CORS Configuration - Production Ready
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://majestic-projects.vercel.app")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",")]
+
+print(f"🌐 CORS enabled for origins: {cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
