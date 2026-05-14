@@ -34,10 +34,12 @@ origins = list(dict.fromkeys(origins))
 
 print(f"🌐 CORS MIDDLEWARE ENABLED")
 print(f"🌐 Allowed origins: {origins}")
+print(f"🌐 Allowed origin regex: https://.*\\.vercel\\.app")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Support all Vercel preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

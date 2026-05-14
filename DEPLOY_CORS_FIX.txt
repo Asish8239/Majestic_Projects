@@ -1,0 +1,69 @@
+═══════════════════════════════════════════════════════════════
+  🚨 URGENT: DEPLOY CORS PREFLIGHT FIX NOW
+═══════════════════════════════════════════════════════════════
+
+ISSUE: OPTIONS /generate preflight rejection
+FIX: Added allow_origin_regex for all Vercel deployments
+
+───────────────────────────────────────────────────────────────
+  DEPLOY COMMANDS (Copy & Paste)
+───────────────────────────────────────────────────────────────
+
+cd d:\Majestic_Projects
+
+git add backend/main.py CORS_REGEX_FIX.md DEPLOY_CORS_FIX.txt
+
+git commit -m "fix: Add CORS regex pattern to support all Vercel deployments"
+
+git push origin main
+
+───────────────────────────────────────────────────────────────
+  WHAT WAS ADDED
+───────────────────────────────────────────────────────────────
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://majestic-projects.vercel.app",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  ← THIS LINE
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+───────────────────────────────────────────────────────────────
+  AFTER DEPLOYMENT (Wait 3 minutes)
+───────────────────────────────────────────────────────────────
+
+1. Open: https://majestic-projects.vercel.app/generator
+2. Open DevTools: F12 → Network tab
+3. Generate a project
+4. Verify:
+   ✅ OPTIONS /generate → 200 OK
+   ✅ POST /generate → 200 OK
+   ✅ No CORS errors
+
+───────────────────────────────────────────────────────────────
+  EXPECTED RESULT
+───────────────────────────────────────────────────────────────
+
+BEFORE: OPTIONS /generate → FAILED (CORS blocked)
+AFTER:  OPTIONS /generate → 200 OK (CORS allowed)
+
+Result: AI generation works in production ✅
+
+───────────────────────────────────────────────────────────────
+  STATUS
+───────────────────────────────────────────────────────────────
+
+✅ Code fixed
+✅ Build verified
+✅ Ready to deploy
+
+ACTION: Run the 3 git commands above NOW
+
+ETA: 5 minutes to production fix
+
+═══════════════════════════════════════════════════════════════
