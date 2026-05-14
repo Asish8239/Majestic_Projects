@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trash2, Download, Copy, FileJson, FileText, Check } from "lucide-react";
-import { getProjects, deleteProject, clearAllProjects } from "@/lib/storage";
-import { ProjectData } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { Trash2, Download, Copy, FileJson, FileText, Check, Star, Eye } from "lucide-react";
+import { useProjects } from "@/hooks/useProjects";
 import {
   exportAsJSON,
   exportAsPDF,
@@ -13,43 +13,55 @@ import {
 } from "@/lib/formatter";
 
 export default function HistoryPage() {
-  const [projects, setProjects] = useState<ProjectData[]>([]);
+  const router = useRouter();
+  const { projects, isLoading, deleteProject, toggleFavorite, refresh } = useProjects();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  const loadProjects = () => {
-    setProjects(getProjects());
-  };
-
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this project?")) {
-      deleteProject(id);
-      loadProjects();
+      const success = await deleteProject(id);
+      if (success) {
+        refresh();
+      }
     }
   };
 
-  const handleClearAll = () => {
-    if (
-      confirm(
-        "Are you sure you want to delete ALL projects? This cannot be undone."
-      )
-    ) {
-      clearAllProjects();
-      loadProjects();
-    }
+  const handleToggleFavorite = async (id: string, currentFavorite: boolean) => {
+    await toggleFavorite(id, !currentFavorite);
+    refresh();
   };
 
-  const handleCopy = async (project: ProjectData) => {
-    await copyToClipboard(formatProjectAsText(project));
+  const handleCopy = async (project: any) => {
+    const textData = {
+      ...project.projectData,
+      id: project.id,
+      timestamp: new Date(project.createdAt).getTime(),
+    };
+    await copyToClipboard(formatProjectAsText(textData));
     setCopiedId(project.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString("en-US", {
+  const handleExportPDF = (project: any) => {
+    const pdfData = {
+      ...project.projectData,
+      id: project.id,
+      timestamp: new Date(project.createdAt).getTime(),
+    };
+    exportAsPDF(pdfData);
+  };
+
+  const handleExportJSON = (project: any) => {
+    const jsonData = {
+      ...project.projectData,
+      id: project.id,
+      timestamp: new Date(project.createdAt).getTime(),
+    };
+    exportAsJSON(jsonData);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -57,6 +69,17 @@ export default function HistoryPage() {
       minute: "2-digit",
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-bounce">📂</div>
+          <p className="text-gray-600 dark:text-gray-400">Loading projects...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -75,18 +98,6 @@ export default function HistoryPage() {
               {projects.length} project{projects.length !== 1 ? "s" : ""} saved
             </p>
           </div>
-
-          {projects.length > 0 && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleClearAll}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all flex items-center space-x-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Clear All</span>
-            </motion.button>
-          )}
         </div>
       </motion.div>
 
@@ -124,28 +135,49 @@ export default function HistoryPage() {
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-                    {project.title}
-                  </h2>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+                      {project.title}
+                    </h2>
+                    {project.isFavorite && (
+                      <Star className="w-5 h-5 text-yellow-500" fill="currentColor" />
+                    )}
+                  </div>
                   <div className="flex items-center space-x-3">
                     <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
                       {project.domain}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(project.timestamp)}
+                      {formatDate(project.createdAt)}
                     </span>
                   </div>
                 </div>
 
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => handleDelete(project.id)}
-                  className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all"
-                  aria-label="Delete project"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </motion.button>
+                <div className="flex items-center space-x-2">
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleToggleFavorite(project.id, project.isFavorite)}
+                    className={`p-2 rounded-lg transition-all ${
+                      project.isFavorite
+                        ? "text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30"
+                        : "text-gray-400 hover:text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+                    }`}
+                    aria-label="Toggle favorite"
+                  >
+                    <Star className="w-5 h-5" fill={project.isFavorite ? "currentColor" : "none"} />
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleDelete(project.id)}
+                    className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all"
+                    aria-label="Delete project"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </motion.button>
+                </div>
               </div>
 
               {/* Problem Statement */}
@@ -154,7 +186,7 @@ export default function HistoryPage() {
                   Problem Statement
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  {project.problem_statement}
+                  {project.projectData?.problem_statement || "No description available"}
                 </p>
               </div>
 
@@ -164,19 +196,35 @@ export default function HistoryPage() {
                   Tech Stack
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {project.tech_stack.map((tech, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs font-medium"
-                    >
-                      {tech}
+                  {project.projectData?.tech_stack?.length > 0 ? (
+                    project.projectData.tech_stack.map((tech, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs font-medium"
+                      >
+                        {tech}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      No tech stack specified
                     </span>
-                  ))}
+                  )}
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => router.push(`/projects/${project.id}`)}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium transition-all"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>View Details</span>
+                </motion.button>
+
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -199,7 +247,7 @@ export default function HistoryPage() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => exportAsPDF(project)}
+                  onClick={() => handleExportPDF(project)}
                   className="flex items-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all"
                 >
                   <FileText className="w-4 h-4" />
@@ -209,7 +257,7 @@ export default function HistoryPage() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => exportAsJSON(project)}
+                  onClick={() => handleExportJSON(project)}
                   className="flex items-center space-x-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-all"
                 >
                   <FileJson className="w-4 h-4" />

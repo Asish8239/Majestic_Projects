@@ -1,0 +1,10 @@
+[35mAUTH_FIX_COMPLETE.md[m[36m:[m      clientSecret: process.env.[1;31mGOOGLE_CLIENT_SECRET[m!,
+[35mAUTH_FIX_COMPLETE.md[m[36m:[m✅ [1;31mGOOGLE_CLIENT_SECRET[m=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
+[35mAUTH_STABILIZATION_COMPLETE.md[m[36m:[m  clientSecret: process.env.[1;31mGOOGLE_CLIENT_SECRET[m!,
+[35mPHASE1_COMPLETE.md[m[36m:[m[1;31mGOOGLE_CLIENT_SECRET[m=your-google-client-secret
+[35mPHASE1_TESTING_GUIDE.md[m[36m:[m[1;31mGOOGLE_CLIENT_SECRET[m=your-google-client-secret
+[35mPHASE2_FINAL_STATUS.md[m[36m:[m- `[1;31mGOOGLE_CLIENT_SECRET[m`
+[35mREADME_PHASE2.md[m[36m:[m[1;31mGOOGLE_CLIENT_SECRET[m=your-google-client-secret
+[35mfrontend/.env.example[m[36m:[m[1;31mGOOGLE_CLIENT_SECRET[m=your-google-client-secret
+[35mfrontend/.gitignore[m[36m:[m[1;31mGOOGLE_CLIENT_SECRET[m=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
+[35mfrontend/lib/auth.ts[m[36m:[m      clientSecret: process.env.[1;31mGOOGLE_CLIENT_SECRET[m!,

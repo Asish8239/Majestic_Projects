@@ -2,8 +2,9 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import {
   Sparkles,
   Heart,
@@ -13,74 +14,76 @@ import {
   Star,
   Trash2,
   ExternalLink,
+  Search,
+  Filter,
+  X,
 } from "lucide-react";
-import { DatabaseService } from "@/lib/db-service";
-import { DBProject } from "@/lib/database.types";
-import Link from "next/link";
+import { useProjectStats, useProjects } from "@/hooks/useProjects";
+import { ProjectFilters } from "@/types/project";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [stats, setStats] = useState({
-    totalProjects: 0,
-    favoriteCount: 0,
-    uniqueDomains: 0,
-    recentProjects: [] as DBProject[],
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login?callbackUrl=/dashboard");
-    }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (session?.user?.id) {
-      loadDashboardData();
-    }
-  }, [session]);
-
-  const loadDashboardData = async () => {
-    if (!session?.user?.id) return;
-
-    setLoading(true);
-    try {
-      const data = await DatabaseService.getUserStats(session.user.id);
-      setStats(data);
-    } catch (error) {
-      console.error("Error loading dashboard:", error);
-    } finally {
-      setLoading(false);
-    }
+  
+  // Filters state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDomain, setSelectedDomain] = useState<string>("");
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "title">("newest");
+  
+  // Build filters object
+  const filters: ProjectFilters = {
+    search: searchTerm || undefined,
+    domain: selectedDomain || undefined,
+    favorite: showFavoritesOnly || undefined,
+    sortBy,
+    limit: 10,
   };
+  
+  // Load stats and projects
+  const { stats, isLoading: statsLoading, refresh: refreshStats } = useProjectStats();
+  const { 
+    projects, 
+    isLoading: projectsLoading, 
+    toggleFavorite, 
+    deleteProject,
+    refresh: refreshProjects 
+  } = useProjects(filters);
+
+  // Redirect if not authenticated
+  if (status === "unauthenticated") {
+    router.push("/login?callbackUrl=/dashboard");
+    return null;
+  }
 
   const handleToggleFavorite = async (projectId: string, currentFavorite: boolean) => {
-    if (!session?.user?.id) return;
-
-    const { error } = await DatabaseService.toggleFavorite(
-      projectId,
-      session.user.id,
-      !currentFavorite
-    );
-
-    if (!error) {
-      loadDashboardData();
+    const success = await toggleFavorite(projectId, !currentFavorite);
+    if (success) {
+      refreshStats();
+      refreshProjects();
     }
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    if (!session?.user?.id) return;
     if (!confirm("Are you sure you want to delete this project?")) return;
-
-    const { error } = await DatabaseService.deleteProject(projectId, session.user.id);
-
-    if (!error) {
-      loadDashboardData();
+    
+    const success = await deleteProject(projectId);
+    if (success) {
+      refreshStats();
+      refreshProjects();
     }
   };
 
-  if (status === "loading" || loading) {
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedDomain("");
+    setShowFavoritesOnly(false);
+    setSortBy("newest");
+  };
+
+  const hasActiveFilters = searchTerm || selectedDomain || showFavoritesOnly || sortBy !== "newest";
+
+  if (status === "loading" || statsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -95,6 +98,9 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Get unique domains for filter dropdown
+  const uniqueDomains = Array.from(new Set(projects.map(p => p.domain)));
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -107,7 +113,7 @@ export default function DashboardPage() {
           Welcome back, {session.user.name?.split(" ")[0] || "there"}!
         </h1>
         <p className="text-gray-600 dark:text-gray-400 text-lg">
-          Here's what's happening with your projects
+          Your AI-powered project workspace
         </p>
       </motion.div>
 
@@ -186,53 +192,149 @@ export default function DashboardPage() {
         </Link>
       </motion.div>
 
-      {/* Recent Projects */}
+      {/* Search and Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
+        className="mb-6 glass dark:glass-dark p-6 rounded-2xl shadow-lg"
+      >
+        <div className="flex items-center space-x-2 mb-4">
+          <Filter className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+            Search & Filter
+          </h3>
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="ml-auto text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1"
+            >
+              <X className="w-4 h-4" />
+              <span>Clear All</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Domain Filter */}
+          <select
+            value={selectedDomain}
+            onChange={(e) => setSelectedDomain(e.target.value)}
+            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">All Domains</option>
+            {uniqueDomains.map((domain) => (
+              <option key={domain} value={domain}>
+                {domain}
+              </option>
+            ))}
+          </select>
+
+          {/* Sort */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="title">Title (A-Z)</option>
+          </select>
+
+          {/* Favorites Toggle */}
+          <button
+            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+            className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
+              showFavoritesOnly
+                ? "bg-yellow-500 text-white"
+                : "bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
+            }`}
+          >
+            <Star className="w-5 h-5" fill={showFavoritesOnly ? "currentColor" : "none"} />
+            <span>Favorites</span>
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Projects List */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-            Recent Projects
+            {showFavoritesOnly ? "Favorite Projects" : "All Projects"}
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              ({projects.length})
+            </span>
           </h2>
           <Link
             href="/history"
             className="text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1"
           >
-            <span>View All</span>
+            <span>View History</span>
             <ExternalLink className="w-4 h-4" />
           </Link>
         </div>
 
-        {stats.recentProjects.length === 0 ? (
+        {projectsLoading ? (
+          <div className="text-center py-12">
+            <div className="text-4xl mb-4 animate-spin">⚙️</div>
+            <p className="text-gray-600 dark:text-gray-400">Loading projects...</p>
+          </div>
+        ) : projects.length === 0 ? (
           <div className="glass dark:glass-dark p-12 rounded-2xl text-center">
             <div className="text-6xl mb-4">📂</div>
             <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">
-              No projects yet
+              {hasActiveFilters ? "No projects match your filters" : "No projects yet"}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Start by generating your first project
+              {hasActiveFilters
+                ? "Try adjusting your search or filters"
+                : "Start by generating your first project"}
             </p>
-            <Link href="/generator">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+            {hasActiveFilters ? (
+              <button
+                onClick={clearFilters}
                 className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold"
               >
-                Get Started
-              </motion.button>
-            </Link>
+                Clear Filters
+              </button>
+            ) : (
+              <Link href="/generator">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold"
+                >
+                  Get Started
+                </motion.button>
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
-            {stats.recentProjects.map((project, index) => (
+            {projects.map((project, index) => (
               <motion.div
                 key={project.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 + index * 0.1 }}
-                className="glass dark:glass-dark p-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
+                transition={{ delay: 0.1 * index }}
+                className="glass dark:glass-dark p-6 rounded-xl shadow-lg hover:shadow-xl transition-all cursor-pointer"
+                onClick={() => router.push(`/projects/${project.id}`)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -245,10 +347,10 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
-                      {project.project_json.problem_statement.substring(0, 150)}...
+                      {project.projectData.problem_statement.substring(0, 150)}...
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {project.project_json.tech_stack.slice(0, 4).map((tech, i) => (
+                      {project.projectData.tech_stack.slice(0, 4).map((tech, i) => (
                         <span
                           key={i}
                           className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs font-medium"
@@ -256,9 +358,9 @@ export default function DashboardPage() {
                           {tech}
                         </span>
                       ))}
-                      {project.project_json.tech_stack.length > 4 && (
+                      {project.projectData.tech_stack.length > 4 && (
                         <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs">
-                          +{project.project_json.tech_stack.length - 4} more
+                          +{project.projectData.tech_stack.length - 4} more
                         </span>
                       )}
                     </div>
@@ -268,20 +370,26 @@ export default function DashboardPage() {
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      onClick={() => handleToggleFavorite(project.id, project.favorite)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleFavorite(project.id, project.isFavorite);
+                      }}
                       className={`p-2 rounded-lg transition-all ${
-                        project.favorite
+                        project.isFavorite
                           ? "text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30"
                           : "text-gray-400 hover:text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
                       }`}
                     >
-                      <Star className="w-5 h-5" fill={project.favorite ? "currentColor" : "none"} />
+                      <Star className="w-5 h-5" fill={project.isFavorite ? "currentColor" : "none"} />
                     </motion.button>
 
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      onClick={() => handleDeleteProject(project.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteProject(project.id);
+                      }}
                       className="p-2 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -291,7 +399,7 @@ export default function DashboardPage() {
 
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                   <span>
-                    Created {new Date(project.created_at).toLocaleDateString()}
+                    Created {new Date(project.createdAt).toLocaleDateString()}
                   </span>
                   {project.difficulty && (
                     <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">

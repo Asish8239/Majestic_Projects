@@ -36,6 +36,7 @@ class GenerateRequest(BaseModel):
     purpose: str = Field(..., description="Purpose (Academic, Portfolio, Startup)")
     output_type: str = Field(..., description="Output type (Idea Only, Abstract, Full Project)")
     regenerate_instruction: Optional[str] = Field(None, description="Instruction for regeneration")
+    memory_context: Optional[str] = Field(None, description="Context of previously generated projects to avoid repetition")
 
 
 class AbstractModel(BaseModel):
@@ -168,7 +169,48 @@ def get_emergency_fallback_dict(domain: str = "AI") -> dict:
 def build_prompt(request: GenerateRequest, strict_json: bool = False) -> str:
     """Build the prompt for the LLM based on request parameters."""
     
-    base_instruction = """You are an expert academic and industry project designer. Generate realistic, implementable, and non-generic project ideas. Avoid vague concepts. Ensure projects can be built by students with limited resources.
+    # Randomized innovation angles for diversity
+    import random
+    innovation_angles = [
+        "real-time analytics and live monitoring",
+        "AI-powered automation and intelligent workflows",
+        "sustainability and environmental impact",
+        "edge computing and distributed intelligence",
+        "predictive intelligence and forecasting",
+        "blockchain integration and decentralization",
+        "voice interfaces and conversational AI",
+        "automation workflows and process optimization",
+        "privacy-first and zero-trust architecture",
+        "cross-platform and multi-device synchronization",
+    ]
+    
+    # Randomized project categories for architectural diversity
+    project_categories = [
+        "SaaS platform",
+        "analytics dashboard",
+        "AI assistant",
+        "mobile-first application",
+        "enterprise system",
+        "automation engine",
+        "IoT platform",
+        "research-grade system",
+        "developer tool",
+        "monitoring system",
+    ]
+    
+    selected_angle = random.choice(innovation_angles)
+    selected_category = random.choice(project_categories)
+    
+    base_instruction = f"""You are an expert academic and industry project designer specializing in interdisciplinary innovation. Generate realistic, implementable, and HIGHLY UNIQUE project ideas.
+
+CRITICAL DIVERSITY REQUIREMENTS:
+- Generate a UNIQUE and NON-REPETITIVE project idea
+- Avoid generic CRUD systems and overused concepts
+- DO NOT generate repetitive healthcare chatbots, basic resume analyzers, or simple voting platforms
+- The project MUST differ significantly in architecture, workflow, implementation strategy, and problem statement
+- Focus on interdisciplinary innovation combining multiple domains creatively
+- Prioritize {selected_angle}
+- Design as a {selected_category}
 
 CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no additional text. Just pure JSON."""
 
@@ -176,17 +218,17 @@ CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no addi
         base_instruction += "\n\nYour previous response was not valid JSON. This time, return ONLY the JSON object with no additional formatting or text."
 
     json_schema = """{
-  "title": "Project title (concise and professional)",
+  "title": "Project title (concise, professional, and UNIQUE)",
   "domain": "The domain category",
-  "problem_statement": "Clear description of the problem (2-3 sentences)",
-  "solution": "Detailed solution approach (3-4 sentences)",
-  "tech_stack": ["Technology 1", "Technology 2", "Technology 3"],
+  "problem_statement": "Clear description of a REAL and SPECIFIC problem (2-3 sentences)",
+  "solution": "Detailed and INNOVATIVE solution approach (3-4 sentences)",
+  "tech_stack": ["Technology 1", "Technology 2", "Technology 3", "Technology 4", "Technology 5"],
   "abstract": {
-    "background": "Background context (2-3 sentences)",
-    "objective": "Main objective (1-2 sentences)",
-    "methodology": "Approach and methods (2-3 sentences)",
-    "results": "Expected outcomes (1-2 sentences)",
-    "conclusion": "Summary and impact (1-2 sentences)"
+    "background": "Background context with real-world relevance (2-3 sentences)",
+    "objective": "Main objective that is specific and measurable (1-2 sentences)",
+    "methodology": "Approach and methods with technical depth (2-3 sentences)",
+    "results": "Expected outcomes with quantifiable impact (1-2 sentences)",
+    "conclusion": "Summary and broader impact (1-2 sentences)"
   }
 }"""
 
@@ -201,17 +243,28 @@ CRITICAL: You MUST return ONLY valid JSON. No markdown, no explanations, no addi
 
     prompt = f"""{base_instruction}
 
-Generate a {request.difficulty} level {request.domain} project for {request.purpose} purpose.
+Generate a {request.difficulty} level project combining: {request.domain}
+Purpose: {request.purpose}
 Output type: {request.output_type}
 
 {regenerate_context}
 
-Requirements:
-- Tech stack must be realistic and free/open-source
+QUALITY REQUIREMENTS:
+- Tech stack must be realistic, modern, and free/open-source
 - Project must be buildable on a standard laptop (i5 processor level)
 - Avoid buzzwords and vague concepts
 - Ensure the project is practical and implementable
-- Tech stack should have 3-6 technologies
+- Tech stack should have 4-6 technologies
+- Focus on INTERDISCIPLINARY innovation
+- Avoid repetitive patterns from common academic projects
+
+INNOVATION FOCUS:
+- Emphasize {selected_angle}
+- Design as a {selected_category}
+- Combine domains in unexpected and creative ways
+- Prioritize technical depth and real-world applicability
+
+{request.memory_context or ""}
 
 Return ONLY this JSON structure:
 {json_schema}

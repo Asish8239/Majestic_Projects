@@ -65,7 +65,7 @@ This will install:
    - Go to Settings → API
    - Copy:
      - Project URL: `https://xxxxx.supabase.co`
-     - anon/public key: `eyJhbGc...`
+     - anon/public key: `your_supabase_anon_key`
 
 ### **Step 3: Setup OAuth Apps**
 
@@ -100,7 +100,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # NextAuth Configuration
 NEXTAUTH_URL=http://localhost:3000

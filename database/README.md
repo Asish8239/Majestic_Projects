@@ -36,13 +36,13 @@ From your Supabase project dashboard:
 **Frontend** (`.env.local`):
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 **Backend** (`.env`):
 ```env
 SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGc...  # Get from Settings → API → service_role key
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key # Get from Settings → API → service_role key
 ```
 
 ### 5. Test Connection

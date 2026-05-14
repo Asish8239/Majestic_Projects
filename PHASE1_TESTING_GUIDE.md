@@ -84,7 +84,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # NextAuth
 NEXTAUTH_URL=http://localhost:3000

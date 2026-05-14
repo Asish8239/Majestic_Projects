@@ -2,29 +2,37 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSession } from "next-auth/react";
 import GeneratorForm from "@/components/GeneratorForm";
 import OutputCard from "@/components/OutputCard";
 import { generateProject, regenerateProject } from "@/lib/api";
-import { saveProject } from "@/lib/storage";
-import { ProjectData } from "@/lib/types";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { useProjects } from "@/hooks/useProjects";
+import { ProjectJSON } from "@/types/project";
+import { AlertCircle, RefreshCw, Check } from "lucide-react";
+import { addToGenerationMemory } from "@/lib/generation-memory";
+import { toast } from "sonner";
 
 export default function GeneratorPage() {
+  const { data: session } = useSession();
+  const { saveProject: saveToStorage } = useProjects();
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [project, setProject] = useState<ProjectData | null>(null);
+  const [project, setProject] = useState<ProjectJSON | null>(null);
   const [lastRequest, setLastRequest] = useState<any>(null);
 
   const handleGenerate = async (formData: any) => {
     setIsLoading(true);
     setError(null);
     setProject(null);
+    setIsSaved(false);
 
     try {
       const response = await generateProject(formData);
       
-      const newProject: Omit<ProjectData, "id" | "timestamp"> = {
+      const newProject: ProjectJSON = {
         title: response.title,
         domain: response.domain,
         problem_statement: response.problem_statement,
@@ -32,18 +40,28 @@ export default function GeneratorPage() {
         tech_stack: response.tech_stack,
         abstract: response.abstract,
       };
-
-      saveProject(newProject);
       
-      // Add id and timestamp for display
-      const displayProject: ProjectData = {
-        ...newProject,
-        id: crypto.randomUUID(),
-        timestamp: Date.now(),
+      setProject(newProject);
+      setLastRequest(formData);
+
+      // Add to generation memory to prevent repetition
+      addToGenerationMemory(newProject.title);
+
+      // Auto-save for all users (authenticated → Supabase, guest → localStorage)
+      const metadata = {
+        difficulty: formData.difficulty,
+        purpose: formData.purpose,
+        outputType: formData.output_type,
       };
       
-      setProject(displayProject);
-      setLastRequest(formData);
+      const saved = await saveToStorage(newProject, metadata);
+      if (saved) {
+        setIsSaved(true);
+        toast.success("Project generated and saved successfully!");
+        setTimeout(() => setIsSaved(false), 3000);
+      } else {
+        toast.error("Project generated but failed to save");
+      }
     } catch (err: any) {
       const errorMessage = err.message || "Failed to generate project. Please try again.";
       setError(errorMessage);
@@ -58,11 +76,12 @@ export default function GeneratorPage() {
 
     setIsRegenerating(true);
     setError(null);
+    setIsSaved(false);
 
     try {
       const response = await regenerateProject(lastRequest, instruction);
       
-      const newProject: Omit<ProjectData, "id" | "timestamp"> = {
+      const newProject: ProjectJSON = {
         title: response.title,
         domain: response.domain,
         problem_statement: response.problem_statement,
@@ -70,16 +89,21 @@ export default function GeneratorPage() {
         tech_stack: response.tech_stack,
         abstract: response.abstract,
       };
-
-      saveProject(newProject);
       
-      const displayProject: ProjectData = {
-        ...newProject,
-        id: crypto.randomUUID(),
-        timestamp: Date.now(),
+      setProject(newProject);
+
+      // Auto-save regenerated project
+      const metadata = {
+        difficulty: lastRequest.difficulty,
+        purpose: lastRequest.purpose,
+        outputType: lastRequest.output_type,
       };
       
-      setProject(displayProject);
+      const saved = await saveToStorage(newProject, metadata);
+      if (saved) {
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      }
     } catch (err: any) {
       const errorMessage = err.message || "Failed to regenerate project. Please try again.";
       setError(errorMessage);
@@ -200,9 +224,30 @@ export default function GeneratorPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
+                className="space-y-4"
               >
+                {/* Auto-Save Feedback */}
+                {isSaved && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex items-center justify-center space-x-2 px-4 py-3 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-xl"
+                  >
+                    <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <span className="text-green-800 dark:text-green-200 font-medium">
+                      Project saved successfully!
+                    </span>
+                  </motion.div>
+                )}
+
+                {/* Output Card */}
                 <OutputCard
-                  project={project}
+                  project={{
+                    ...project,
+                    id: crypto.randomUUID(),
+                    timestamp: Date.now(),
+                  }}
                   onRegenerate={handleRegenerate}
                   isRegenerating={isRegenerating}
                 />
